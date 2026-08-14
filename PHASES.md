@@ -86,12 +86,22 @@ against a local Anvil chain with no precompile; a test asserts that an empty
 selected from the probe result, with a test for each branch; module addresses are
 confirmed live and the confirmation is recorded.
 
-**Status: partially complete.** The probe, the capability cache, the chain
-registry, and their unit tests are built and passing. Three DoD items remain
-blocked by the environment (see `CLAUDE.md` → Environment limits): live Base
-Sepolia verification, the Anvil absent-case check, and on-chain confirmation of
-module addresses. The unit tests cover the absent case against mocks, which is
-necessary but not sufficient — the real-EVM check still has to happen.
+**Status: mostly complete.** The probe, the capability cache, the chain
+registry, and their unit tests are built and passing.
+
+The real-EVM check is **done**, by a route that did not need Anvil. `@ethereumjs/evm`
+installs from npm (which egress permits) and supports both `Prague` and `Osaka`,
+so `p256.evm.test.ts` exercises the precompile present and absent against an
+actual EVM. It demonstrates that a CALL to an empty `0x100` succeeds with empty
+returndata and zero gas — byte-identical to RIP-7212 reporting an invalid
+signature — that a genuinely invalid signature at the same address is likewise
+indistinguishable, and that the precompile charges exactly the 6900 gas the code
+budgets. The central security claim is now shown rather than assumed, and it
+runs in CI.
+
+Two DoD items remain blocked (see `CLAUDE.md` → Environment limits): probing
+Base Sepolia specifically, and confirming the Rhinestone module addresses are
+deployed. Both need live-chain egress.
 
 **Amended during implementation.** The original DoD said gas estimation selects
 "3450 vs 6900 vs fallback." That distinction turns out not to be soundly

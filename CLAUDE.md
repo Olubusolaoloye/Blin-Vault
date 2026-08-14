@@ -269,12 +269,23 @@ can be completed or verified here:
 | Blocked | Consequence |
 |---|---|
 | No macOS/Xcode, no Android SDK, no devices or emulators | Cannot build, run, or E2E-test the app. Phase 1 Tasks 2, 5, 6, 7 (UI), 10 (E2E), 12 cannot be completed |
-| Egress policy blocks RPC endpoints (`sepolia.base.org` → 403) | Cannot verify anything against a live chain: probe behaviour, module deployment, counterfactual addresses, gas |
-| Egress policy blocks Foundry install and GitHub releases | No `forge`, no `anvil`, so no contract tests and no local EVM |
+| Egress policy blocks RPC endpoints (`sepolia.base.org` → 403) | Cannot verify anything against a live chain: deployed module addresses, counterfactual addresses, real bundler behaviour, real gas |
+| Egress policy blocks Foundry install and GitHub releases (403) | No `forge`, no `anvil`, so no Solidity contract tests |
 
-Work that is pure TypeScript and unit-testable can proceed here. Anything
-requiring a device, a live chain, or a local EVM needs a different machine. Do
-not mark those tasks done on the strength of unit tests against mocks.
+`registry.npmjs.org` **is** reachable, which matters more than it sounds.
+
+**A real EVM is available here** via `@ethereumjs/evm`, installed from npm. It
+supports both the `Prague` and `Osaka` hardforks, so the EIP-7951 precompile at
+`0x100` can be exercised present *and* absent. `p256.evm.test.ts` uses this to
+demonstrate — rather than assert — that a CALL to an empty `0x100` succeeds
+with empty returndata and zero gas, and that the precompile charges exactly
+6900 gas. That closes the most important open question in Task 3 without a live
+chain.
+
+What a real EVM does **not** substitute for: deployed contract addresses, real
+bundler and paymaster behaviour, mainnet-fork state, and Solidity-level tests
+(which need Foundry). Do not mark those done on the strength of unit tests
+against mocks.
 
 ---
 
