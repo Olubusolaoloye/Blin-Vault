@@ -32,6 +32,13 @@ export default tseslint.config(
       /* No empty catch blocks. If a failure is genuinely unreachable, assert
          loudly instead of swallowing it. */
       'no-empty': ['error', { allowEmptyCatch: false }],
+
+      /* Leading underscore marks a deliberately unused binding — a parameter
+         kept to document a signature, or a discarded destructured field. */
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
     },
   },
   {
