@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Secrets — only .env.example is ever committed (CLAUDE.md conventions)
+.env
+.env.*
+!.env.example
+
+# Foundry
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/
+
+# Expo / React Native (app shell, when scaffolded)
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+.DS_Store

@@ -234,19 +234,47 @@ it, and exactly which factors are required and why (Invariant 8).
 
 ## Commands
 
-**None of these exist yet.** They land with Phase 1 Task 1 (repo scaffolding) and
-this section gets updated to match reality at that point. Listed here so the
-shape is agreed in advance.
+These exist and pass:
 
 ```
-pnpm install            # install workspace dependencies
-pnpm typecheck          # tsc --noEmit, strict, must be clean
-pnpm lint               # eslint, must be clean
-pnpm test               # vitest unit tests
-pnpm ios / pnpm android # Expo dev client
-forge test              # contract tests, from packages/contracts
-forge test --match-test invariant   # invariant suite
+pnpm install     # install workspace dependencies
+pnpm typecheck   # tsc --noEmit, strict, must be clean
+pnpm lint        # eslint incl. core/-purity rule, must be clean
+pnpm test        # vitest unit tests
 ```
+
+Not yet scaffolded, because this environment cannot build or run them (see
+[Environment limits](#environment-limits)):
+
+```
+pnpm ios / pnpm android          # Expo dev client — needs macOS/Xcode, Android SDK
+forge test                       # contracts — Foundry not installable here
+forge test --match-test invariant
+```
+
+**Toolchain note.** TypeScript is pinned to 6.0.3 rather than the current 7.0.2
+because `typescript-eslint@8.67.0` declares `typescript >=4.8.4 <6.1.0`. Type-aware
+linting is load-bearing here — it is what enforces `no-floating-promises` and the
+`core/` purity rule — so it wins over the newer compiler. Revisit when
+typescript-eslint supports TS 7.
+
+---
+
+## Environment limits
+
+The container this project has been developed in so far is Linux with Node and
+pnpm only. The following are **not** available, which caps how much of Phase 1
+can be completed or verified here:
+
+| Blocked | Consequence |
+|---|---|
+| No macOS/Xcode, no Android SDK, no devices or emulators | Cannot build, run, or E2E-test the app. Phase 1 Tasks 2, 5, 6, 7 (UI), 10 (E2E), 12 cannot be completed |
+| Egress policy blocks RPC endpoints (`sepolia.base.org` → 403) | Cannot verify anything against a live chain: probe behaviour, module deployment, counterfactual addresses, gas |
+| Egress policy blocks Foundry install and GitHub releases | No `forge`, no `anvil`, so no contract tests and no local EVM |
+
+Work that is pure TypeScript and unit-testable can proceed here. Anything
+requiring a device, a live chain, or a local EVM needs a different machine. Do
+not mark those tasks done on the strength of unit tests against mocks.
 
 ---
 

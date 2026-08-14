@@ -82,9 +82,24 @@ that check passes.
 
 **Done when:** the probe correctly reports *present* on Base Sepolia and *absent*
 against a local Anvil chain with no precompile; a test asserts that an empty
-`0x100` is classified absent and never as "signature invalid"; gas estimation
-selects 3450 vs 6900 vs fallback from the probe result, with a test for each
-branch; module addresses are confirmed live and the confirmation is recorded.
+`0x100` is classified absent and never as "signature invalid"; gas estimation is
+selected from the probe result, with a test for each branch; module addresses are
+confirmed live and the confirmation is recorded.
+
+**Status: partially complete.** The probe, the capability cache, the chain
+registry, and their unit tests are built and passing. Three DoD items remain
+blocked by the environment (see `CLAUDE.md` → Environment limits): live Base
+Sepolia verification, the Anvil absent-case check, and on-chain confirmation of
+module addresses. The unit tests cover the absent case against mocks, which is
+necessary but not sufficient — the real-EVM check still has to happen.
+
+**Amended during implementation.** The original DoD said gas estimation selects
+"3450 vs 6900 vs fallback." That distinction turns out not to be soundly
+detectable: for a *valid* signature RIP-7212 and EIP-7951 are byte-identical in
+address, input, and output, so separating them would need a gas-constrained
+probe. The 3450 gas difference is negligible on an L2 while an under-estimate
+fails a transaction the user already approved, so the implementation budgets the
+conservative 6900 for any precompile and documents why.
 
 ---
 
