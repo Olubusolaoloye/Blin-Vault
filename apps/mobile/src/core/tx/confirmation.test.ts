@@ -18,7 +18,7 @@ const BOB = AddressSchema.parse('0x799318de96e2ccb47fd2e61aaf61a3951c3d338e')
 
 const ETH: TokenRef = { kind: 'native', symbol: 'ETH', decimals: 18 }
 
-const FEE: FeeQuote = { maxFee: 21_000n, token: ETH }
+const FEE: FeeQuote = { kind: 'charged', maxFee: 21_000n, token: ETH }
 
 function knownRecipients(...addresses: readonly string[]): KnownRecipients {
   const set = new Set(addresses)
@@ -54,8 +54,7 @@ describe('buildTransferConfirmation', () => {
     // Invariant 8: amount, recipient, fee and its paying token, and factors.
     expect(confirmation.intent.amount).toBe(1_000n)
     expect(confirmation.intent.to).toBe(ALICE)
-    expect(confirmation.fee.maxFee).toBe(21_000n)
-    expect(confirmation.fee.token.symbol).toBe('ETH')
+    expect(confirmation.fee).toEqual({ kind: 'charged', maxFee: 21_000n, token: ETH })
     expect(confirmation.required.factors).toEqual(['passkey'])
   })
 
@@ -85,12 +84,12 @@ describe('buildTransferConfirmation', () => {
     const usdc: TokenRef = { kind: 'erc20', address: BOB, symbol: 'USDC', decimals: 6 }
     const confirmation = buildTransferConfirmation({
       intent: { to: ALICE, amount: 5n, token: ETH, chainId: 84532 },
-      fee: { maxFee: 1_500n, token: usdc },
+      fee: { kind: 'charged', maxFee: 1_500n, token: usdc },
       knownRecipients: knownRecipients(),
     })
 
     expect(confirmation.intent.token.symbol).toBe('ETH')
-    expect(confirmation.fee.token.symbol).toBe('USDC')
+    expect(confirmation.fee).toMatchObject({ kind: 'charged', token: { symbol: 'USDC' } })
   })
 
   it.each([
@@ -110,19 +109,36 @@ describe('buildTransferConfirmation', () => {
     expect(() =>
       buildTransferConfirmation({
         intent: intentTo(ALICE),
-        fee: { maxFee: -1n, token: ETH },
+        fee: { kind: 'charged', maxFee: -1n, token: ETH },
         knownRecipients: knownRecipients(),
       }),
     ).toThrow(InvalidTransferError)
   })
 
-  it('accepts a zero fee, which a sponsoring paymaster produces', () => {
+  /**
+   * Sponsorship is its own case, not a zero amount. Found during the Task 11
+   * self-review: when 0n had to mean both "sponsored" and "estimate not back
+   * yet", a screen rendering mid-estimate could pass 0n, clear the biometric
+   * gate, and show a cost that was not real (Invariant 8). "Unknown" is now
+   * unrepresentable — a caller without a fee cannot build a confirmation.
+   */
+  it('represents sponsorship explicitly rather than as a zero fee', () => {
     const confirmation = buildTransferConfirmation({
       intent: intentTo(ALICE),
-      fee: { maxFee: 0n, token: ETH },
+      fee: { kind: 'sponsored' },
       knownRecipients: knownRecipients(),
     })
-    expect(confirmation.fee.maxFee).toBe(0n)
+    expect(confirmation.fee).toEqual({ kind: 'sponsored' })
+  })
+
+  it('cannot express an unknown fee, so one cannot reach the prompt', () => {
+    // @ts-expect-error: a fee without a `kind` is not a FeeQuote. The compiler
+    // rejecting this IS the control — a caller mid-estimate cannot build a
+    // confirmation at all, so it cannot reach the biometric prompt. If this
+    // directive ever goes unused, the hole has reopened.
+    const unknownFee: FeeQuote = { maxFee: 0n, token: ETH }
+
+    expect(unknownFee).toBeDefined()
   })
 })
 

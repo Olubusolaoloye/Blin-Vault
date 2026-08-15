@@ -36,12 +36,27 @@ export interface TransferIntent {
   readonly chainId: number
 }
 
-export interface FeeQuote {
+/**
+ * What this transfer will cost.
+ *
+ * A discriminated union rather than a plain `{ maxFee, token }`, because of a
+ * hole found during the Task 11 self-review: with a bare bigint, `0n` has to
+ * serve as both "a paymaster is sponsoring this" and "the estimate has not come
+ * back yet". Those are opposite facts. A screen that renders while the estimate
+ * is still in flight would naturally pass `0n`, which reads as sponsored,
+ * satisfies the biometric gate, and shows the user a cost that is not real —
+ * violating Invariant 8 without anyone writing a bug.
+ *
+ * Modelling it this way makes "unknown" unrepresentable: a caller without a fee
+ * cannot construct a FeeQuote, so it cannot construct a TransferConfirmation,
+ * so it cannot reach the prompt. The type system does the enforcing rather than
+ * a runtime check that has to remember to be called.
+ */
+export type FeeQuote =
+  /** A paymaster covers this; the user pays nothing. */
+  | { readonly kind: 'sponsored' }
   /** Worst-case fee in the smallest unit of `token`. */
-  readonly maxFee: bigint
-  /** Which token actually pays — may differ from the token being sent. */
-  readonly token: TokenRef
-}
+  | { readonly kind: 'charged'; readonly maxFee: bigint; readonly token: TokenRef }
 
 /**
  * Whether this recipient has been sent to before.
@@ -129,7 +144,7 @@ export function buildTransferConfirmation(args: {
   if (intent.amount <= 0n) {
     throw new InvalidTransferError('Transfer amount must be greater than zero.')
   }
-  if (fee.maxFee < 0n) {
+  if (fee.kind === 'charged' && fee.maxFee < 0n) {
     throw new InvalidTransferError('Fee quote must not be negative.')
   }
 

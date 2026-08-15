@@ -242,6 +242,23 @@ A dedicated pass, not a side effect of the other tasks, hunting specifically for
 and what was fixed. "Found nothing" is an acceptable outcome only if the write-up
 shows what was actually looked at.
 
+**Status: done for the code that exists,** written up in `SECURITY-REVIEW.md`.
+
+One high-severity finding, fixed: an unknown fee could reach the biometric
+prompt. `FeeQuote` carried a bare `maxFee`, where `0n` meant both "sponsored"
+and "estimate not back yet" — so a screen rendering mid-estimate could clear the
+Invariant 8 gate and show a cost that was not real. `FeeQuote` is now a
+discriminated union, making "unknown" unrepresentable.
+
+Two findings accepted and deferred with reasons recorded: `Address` is
+structural rather than branded (revisit when the app shell lands), and CI
+actions are pinned by tag rather than SHA (pin before any workflow holds a
+secret).
+
+The UI- and device-dependent hazards — screenshot suppression, backgrounding,
+root detection, crash-reporter integration — are listed as not reviewable here
+rather than as passes, and must be reviewed again once those layers exist.
+
 ---
 
 ## Task 12 — Gate deliverable
