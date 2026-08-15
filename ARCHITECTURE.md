@@ -245,8 +245,25 @@ tested rather than documented and hoped for:
   breaker, so a failing upstream is not remembered between requests and one
   request's outcome never depends on another's.
 
-Still to build before the proxy is deployable: the HTTP binding itself, rate
-limiting, and certificate pinning at the app end.
+The HTTP binding adds the checks about requests that never reach the handler:
+POST-only on one path, no CORS headers (this endpoint serves our app, not a
+browser origin, and emitting them would let a hostile page spend our API
+quota), and a body cap enforced *during* streaming rather than after buffering —
+a limit applied once the memory is already committed is not a limit.
+X-Forwarded-For is deliberately ignored when identifying a caller, since it is
+client-controlled and honouring it would let an attacker mint a fresh identity
+per request. These are tested against a real bound socket, because streaming
+caps and destroyed sockets do not exist in a mocked request object.
+
+Rate limiting is the one place the proxy remembers anything, and
+`rateLimit.ts` states that tension rather than hiding it: keyed on a transport
+identifier only and never on an account, in memory only, expiring with the
+window, and bounded — an unbounded map keyed by an attacker-controlled value is
+itself a denial-of-service vector. The bound brings an accepted weakness, which
+is documented and pinned by a test rather than left to be discovered.
+
+Still to build before the proxy is deployable: TLS termination and deployment
+config, and certificate pinning at the app end.
 
 Certificate-pin RPC and bundler connections. Treat every response as untrusted
 and parse it with Zod before use, including responses from our own proxy.
