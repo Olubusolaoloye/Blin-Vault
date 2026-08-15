@@ -225,6 +225,29 @@ proxy entirely offline. That property is what makes Invariant 2 and Invariant 7
 true rather than aspirational, and it should be an explicit test — "works with
 proxy unreachable" — not an assumption.
 
+**Implemented** in `services/proxy/`. Three properties are enforced in code and
+tested rather than documented and hoped for:
+
+- **Method allowlist, not denylist.** The proxy forwards the chain reads and
+  ERC-4337 methods the wallet needs, and nothing else, so a compromised client
+  cannot use our keys as an open RPC endpoint. Signing methods are refused
+  without contacting an upstream — upstream would reject them anyway, but
+  forwarding them would make the proxy *look* like a signing service, and the
+  shape of an interface teaches people what it is for (Invariant 2).
+- **No upstream error text reaches a client.** Provider keys live in URLs,
+  upstream errors quote the request URL, and the error path is the least
+  exercised in testing — so relaying an upstream failure verbatim is the easiest
+  way to hand a client the key the proxy exists to hide. Clients get a generic
+  failure; operators read their own logs. Tested by feeding the handler an
+  exception containing a live-looking key and asserting it cannot be found
+  anywhere in the response.
+- **Statelessness is tested, not asserted.** No health cache and no circuit
+  breaker, so a failing upstream is not remembered between requests and one
+  request's outcome never depends on another's.
+
+Still to build before the proxy is deployable: the HTTP binding itself, rate
+limiting, and certificate pinning at the app end.
+
 Certificate-pin RPC and bundler connections. Treat every response as untrusted
 and parse it with Zod before use, including responses from our own proxy.
 
