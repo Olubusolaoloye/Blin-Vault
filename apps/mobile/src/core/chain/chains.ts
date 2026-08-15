@@ -41,8 +41,18 @@ export const DEFAULT_CHAIN: ChainConfig = BASE_SEPOLIA
 
 export class UnknownChainError extends Error {
   override readonly name = 'UnknownChainError'
-  constructor(readonly chainId: number) {
+  readonly chainId: number
+
+  /**
+   * Written as an explicit field rather than a TypeScript parameter property:
+   * parameter properties are a TS-only construct that emits code, so they do
+   * not survive type-stripping (Node's `--experimental-strip-types`, and
+   * strip-only transforms generally). Keeping the source strippable means
+   * tooling can run these modules without a full compile.
+   */
+  constructor(chainId: number) {
     super(`Chain ${String(chainId)} is not in the supported set.`)
+    this.chainId = chainId
   }
 }
 

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:onchain": "node --experimental-strip-types scripts/verify-onchain.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -25,6 +26,7 @@
     "vitest": "4.1.10"
   },
   "dependencies": {
+    "@rhinestone/module-sdk": "0.4.0",
     "ox": "1.6.2",
     "viem": "2.55.16",
     "zod": "4.4.3"

@@ -12,7 +12,7 @@ turn comes, not before.
 
 | Phase | Delivers | Status |
 |---|---|---|
-| 1 | Passkey smart account, no ZK | **Not started — awaiting approval of design docs** |
+| 1 | Passkey smart account, no ZK | **In progress** — Tasks 1, 3, 11 done; 7/8/9 core done; 2, 4, 5, 6, 10, 12 open |
 | 2 | zkEmail recovery | Not started |
 | 3 | Risk-adaptive quorum | Not started |
 | 4 | Anonymous guardians | Not started |
@@ -99,9 +99,18 @@ indistinguishable, and that the precompile charges exactly the 6900 gas the code
 budgets. The central security claim is now shown rather than assumed, and it
 runs in CI.
 
-Two DoD items remain blocked (see `CLAUDE.md` → Environment limits): probing
-Base Sepolia specifically, and confirming the Rhinestone module addresses are
-deployed. Both need live-chain egress.
+**Both remaining DoD items are now closed** (network egress was opened
+2026-08-15). `pnpm verify:onchain` probes Base Sepolia directly: the precompile
+returns an affirmative `0x…01` and classifies as `precompile`, and all eight
+Rhinestone module addresses carry code at block 45,509,248. Evidence recorded in
+`ARCHITECTURE.md` §3 and §9.
+
+That script is deliberately **not** part of `pnpm test`. A test that reaches the
+network fails when a provider hiccups, and CLAUDE.md says a flaky test gets its
+race fixed rather than retried — so the unit suite stays hermetic and this runs
+on demand.
+
+**Task 3 is done.**
 
 **Amended during implementation.** The original DoD said gas estimation selects
 "3450 vs 6900 vs fallback." That distinction turns out not to be soundly

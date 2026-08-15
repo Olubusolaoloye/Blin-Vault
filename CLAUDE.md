@@ -32,11 +32,21 @@ disagree, this repo is correct and the disagreement is recorded under
 
 ## Current status
 
-**Phase 0 — design documents, awaiting approval. No application code exists yet.**
+**Phase 1 — in progress.** Design docs approved 2026-08-14.
 
-Nothing has been built. `CLAUDE.md`, `ARCHITECTURE.md`, and `PHASES.md` are the
-entire deliverable so far. Phase 1 does not begin until the human approves these
-three files.
+Done: Task 1 (scaffolding), Task 3 (chain config and P-256 detection, verified
+against both a real EVM and live Base Sepolia), Task 11 (security self-review,
+written up in `SECURITY-REVIEW.md`), the pure `core/` logic behind Tasks 7, 8 and
+9, and the stateless proxy from `ARCHITECTURE.md` §7.
+
+Open: Task 2 (passkey spike), 4 (account construction), 5 (wallet creation),
+6 (balance view), 7 (UI), 10 (E2E), 12 (gate). All of these need real devices and
+an iOS/Android toolchain, neither of which exists in the development container.
+
+321 tests, nothing skipped. `pnpm typecheck` and `pnpm lint` clean.
+
+**Phase 1 is not complete and must not be described as such** — see
+[Known gaps](#known-gaps) for the Invariant 3 caveat in particular.
 
 ---
 
@@ -269,10 +279,14 @@ can be completed or verified here:
 | Blocked | Consequence |
 |---|---|
 | No macOS/Xcode, no Android SDK, no devices or emulators | Cannot build, run, or E2E-test the app. Phase 1 Tasks 2, 5, 6, 7 (UI), 10 (E2E), 12 cannot be completed |
-| Egress policy blocks RPC endpoints (`sepolia.base.org` → 403) | Cannot verify anything against a live chain: deployed module addresses, counterfactual addresses, real bundler behaviour, real gas |
-| Egress policy blocks Foundry install and GitHub releases (403) | No `forge`, no `anvil`, so no Solidity contract tests |
+| ~~Egress policy blocks RPC endpoints~~ | **Resolved 2026-08-15.** Base Sepolia is reachable; `pnpm verify:onchain` confirms the precompile and all module deployments |
+| GitHub release assets are scoped to session-attached repos | `foundryup` still fails. This is the GitHub proxy, not the network allowlist, so allowlisting does not fix it. No `forge`/`anvil` yet |
 
 `registry.npmjs.org` **is** reachable, which matters more than it sounds.
+
+**Node's built-in fetch ignores `HTTPS_PROXY`.** viem uses it, so any script
+hitting a live RPC must run with `NODE_USE_ENV_PROXY=1` — without it you get a
+403 that looks like a policy denial but is not one.
 
 **A real EVM is available here** via `@ethereumjs/evm`, installed from npm. It
 supports both the `Prague` and `Osaka` hardforks, so the EIP-7951 precompile at

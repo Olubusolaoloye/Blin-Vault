@@ -16,7 +16,7 @@ Anything not verified is marked as such.
 | App | React Native + TypeScript strict, Expo with dev client | — | Native modules required for passkeys, so Expo Go is not viable |
 | Chain | `viem` | 2.55.16 | Standard, typed, Zod-friendly |
 | ERC-4337 | `permissionless` | 0.3.7 | Do not hand-roll UserOperation construction |
-| Modules | `@rhinestone/module-sdk` | 0.4.0 | Audited module registry; ships every module we need |
+| Modules | `@rhinestone/module-sdk` | 0.4.0 ⚠️ **deprecated** | Ships every module we need, but upstream says switch to `@rhinestone/sdk` — see §11 |
 | Account | Safe + Safe7579 adapter | via `toSafeSmartAccount` | See §2 |
 | Passkeys | `react-native-passkey` | 3.6.1 | Actively maintained; iOS 15+/Android API 28+ |
 | Recovery (Ph2) | `@zk-email/email-recovery` | 1.1.0 | Ackee-audited, live on Base |
@@ -109,6 +109,12 @@ Two ways to get this catastrophically wrong:
 then treat the precompile as present. Cache the result per chain ID. Gas
 estimation must use the correct constant, since 3450 and 6900 are both real
 and a strategy chosen for the wrong one under-quotes the fee.
+
+**Confirmed on Base Sepolia (2026-08-15, block 45,509,248).** The probe returns
+an affirmative `0x…01` and classifies as `precompile`, so Base Sepolia carries
+the precompile at `0x100`. Together with the `@ethereumjs/evm` suite — which
+demonstrates the absent case, the invalid-signature case, and the exact 6900 gas
+charge — both sides of the detection rule are now evidenced rather than argued.
 
 **Client-side interaction.** `@rhinestone/module-sdk`'s
 `WebauthnValidatorSignature` type carries a `usePrecompiled?: boolean` flag, so
@@ -302,10 +308,13 @@ reviewable in isolation.
 
 Recorded rather than guessed.
 
-1. **Are the Rhinestone module addresses identical across Base Sepolia and Base
-   mainnet?** The SDK exports single constants, which implies deterministic
-   deployment, but this must be verified on-chain in Phase 1 Task 3 before any
-   address is hardcoded.
+1. ~~**Are the Rhinestone module addresses deployed?**~~ **ANSWERED
+   2026-08-15**, verified against Base Sepolia at block 45,509,248 by
+   `pnpm verify:onchain`. All eight carry code: WebAuthn validator (4,739b),
+   SmartSessions (23,608b), value-limit (2,511b), time-frame (1,911b), sudo
+   (920b), universal email recovery (22,094b), registry (18,522b), multi-factor
+   validator (5,436b). Base *mainnet* parity is still unverified and out of
+   scope until after audit (decision 4).
 2. **Does `react-native-passkey@3.6.1` work under Expo dev client on both
    platforms without patching?** Assume nothing; Phase 1 Task 2 is a spike.
 3. **Real gas cost of a Safe7579 deployment + first UserOp on Base.** Needed to
@@ -325,3 +334,50 @@ EIP-7702 activation (Phase 5), additional chains (Phase 5), ERC-20 paymaster
 token selection (needs the Base decision to be final), and the on-device proving
 question (Phase 2, pending benchmark). None of these should be designed for
 speculatively now.
+
+
+---
+
+## 11. Open decision: the module SDK is deprecated
+
+Found while verifying module deployments on 2026-08-15. `pnpm add
+@rhinestone/module-sdk` reports:
+
+> This SDK is no longer supported. Please switch to '@rhinestone/sdk' to
+> continue getting updates.
+
+`0.4.0` is the final release. This document recommended it without checking
+deprecation status, which was an oversight worth correcting explicitly rather
+than quietly swapping.
+
+**What is and is not at risk.** The module *addresses* are immutable on-chain
+and now independently verified, so nothing about the deployed security
+properties changes. What we lose is maintenance of the client library that
+supplies those constants and encodes init data — a smaller surface than it
+sounds, but not nothing, since a stale encoder against an upgraded module is a
+silent failure.
+
+**The successor is not a like-for-like swap.** `@rhinestone/sdk@2.2.2`
+describes itself as a "vertically integrated smart wallet and crosschain
+liquidity platform" with an intent engine, an orchestrator, a relayer market,
+and gas sponsorship. It covers what we need — `./actions/passkeys`,
+`./signing/passkeys`, `./smart-sessions`, `./actions/recovery`,
+`./actions/mfa` — but `apiKey` appears throughout its `transactions/intents`
+subsystem.
+
+That matters for Invariant 7. A hosted orchestrator in the transaction path
+would be exactly the proprietary channel the invariant forbids. It appears
+avoidable — the intent engine looks separable from the module and passkey
+paths — but "appears avoidable" is not a basis for putting it in a wallet's
+trust path without a deliberate decision.
+
+**Options, for the human to choose:**
+
+| | Approach | Cost |
+|---|---|---|
+| A | Stay on `0.4.0` | No updates ever. Acceptable mainly because we depend on it for constants and ABI encoding, both verifiable on-chain — which `verify:onchain` now does |
+| B | Migrate to `@rhinestone/sdk@2.2.2` | Maintained, but a far larger surface, and needs a careful audit that no orchestrator or API-key path can reach a transaction |
+| C | Vendor the constants | Record the eight verified addresses in our own chain config with the verification evidence, and encode init data with viem directly. Maximum independence, and `verify:onchain` already proves the addresses. Cost: we own the encoding, and must track upstream module upgrades ourselves |
+
+Not decided. Phase 1 can proceed on `0.4.0` either way, because the addresses
+are verified and the encoding is exercised by tests.

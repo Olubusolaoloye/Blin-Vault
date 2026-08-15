@@ -20,12 +20,13 @@
     "useUnknownInCatchVariables": true,
 
     "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["apps/**/*.ts", "services/**/*.ts", "*.config.ts"],
+  "include": ["apps/**/*.ts", "services/**/*.ts", "scripts/**/*.ts", "*.config.ts"],
   "exclude": ["node_modules", "**/dist", "**/build"]
 }
