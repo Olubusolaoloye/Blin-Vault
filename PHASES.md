@@ -12,7 +12,7 @@ turn comes, not before.
 
 | Phase | Delivers | Status |
 |---|---|---|
-| 1 | Passkey smart account, no ZK | **Not started — awaiting approval of design docs** |
+| 1 | Passkey smart account, no ZK | **In progress** — Tasks 1, 3, 11 done; 7/8/9 core done; 2, 4, 5, 6, 10, 12 open |
 | 2 | zkEmail recovery | Not started |
 | 3 | Risk-adaptive quorum | Not started |
 | 4 | Anonymous guardians | Not started |
@@ -82,9 +82,43 @@ that check passes.
 
 **Done when:** the probe correctly reports *present* on Base Sepolia and *absent*
 against a local Anvil chain with no precompile; a test asserts that an empty
-`0x100` is classified absent and never as "signature invalid"; gas estimation
-selects 3450 vs 6900 vs fallback from the probe result, with a test for each
-branch; module addresses are confirmed live and the confirmation is recorded.
+`0x100` is classified absent and never as "signature invalid"; gas estimation is
+selected from the probe result, with a test for each branch; module addresses are
+confirmed live and the confirmation is recorded.
+
+**Status: mostly complete.** The probe, the capability cache, the chain
+registry, and their unit tests are built and passing.
+
+The real-EVM check is **done**, by a route that did not need Anvil. `@ethereumjs/evm`
+installs from npm (which egress permits) and supports both `Prague` and `Osaka`,
+so `p256.evm.test.ts` exercises the precompile present and absent against an
+actual EVM. It demonstrates that a CALL to an empty `0x100` succeeds with empty
+returndata and zero gas — byte-identical to RIP-7212 reporting an invalid
+signature — that a genuinely invalid signature at the same address is likewise
+indistinguishable, and that the precompile charges exactly the 6900 gas the code
+budgets. The central security claim is now shown rather than assumed, and it
+runs in CI.
+
+**Both remaining DoD items are now closed** (network egress was opened
+2026-08-15). `pnpm verify:onchain` probes Base Sepolia directly: the precompile
+returns an affirmative `0x…01` and classifies as `precompile`, and all eight
+Rhinestone module addresses carry code at block 45,509,248. Evidence recorded in
+`ARCHITECTURE.md` §3 and §9.
+
+That script is deliberately **not** part of `pnpm test`. A test that reaches the
+network fails when a provider hiccups, and CLAUDE.md says a flaky test gets its
+race fixed rather than retried — so the unit suite stays hermetic and this runs
+on demand.
+
+**Task 3 is done.**
+
+**Amended during implementation.** The original DoD said gas estimation selects
+"3450 vs 6900 vs fallback." That distinction turns out not to be soundly
+detectable: for a *valid* signature RIP-7212 and EIP-7951 are byte-identical in
+address, input, and output, so separating them would need a gas-constrained
+probe. The 3450 gas difference is negligible on an L2 while an under-estimate
+fails a transaction the user already approved, so the implementation budgets the
+conservative 6900 for any precompile and documents why.
 
 ---
 
@@ -216,6 +250,23 @@ A dedicated pass, not a side effect of the other tasks, hunting specifically for
 **Done when:** the pass is written up with what was searched for, what was found,
 and what was fixed. "Found nothing" is an acceptable outcome only if the write-up
 shows what was actually looked at.
+
+**Status: done for the code that exists,** written up in `SECURITY-REVIEW.md`.
+
+One high-severity finding, fixed: an unknown fee could reach the biometric
+prompt. `FeeQuote` carried a bare `maxFee`, where `0n` meant both "sponsored"
+and "estimate not back yet" — so a screen rendering mid-estimate could clear the
+Invariant 8 gate and show a cost that was not real. `FeeQuote` is now a
+discriminated union, making "unknown" unrepresentable.
+
+Two findings accepted and deferred with reasons recorded: `Address` is
+structural rather than branded (revisit when the app shell lands), and CI
+actions are pinned by tag rather than SHA (pin before any workflow holds a
+secret).
+
+The UI- and device-dependent hazards — screenshot suppression, backgrounding,
+root detection, crash-reporter integration — are listed as not reviewable here
+rather than as passes, and must be reviewed again once those layers exist.
 
 ---
 

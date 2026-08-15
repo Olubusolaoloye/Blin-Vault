@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A phase is never complete with failing or skipped tests (CLAUDE.md). CI is
+# what makes that claim checkable by a reviewer rather than asserted by the
+# author.
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # --frozen-lockfile: CI must fail rather than silently resolve a
+      # different dependency tree than the one that was reviewed. Dependency
+      # drift in a wallet is a supply-chain question, not a convenience one.
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test

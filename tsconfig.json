@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+
+    /* Strictness. CLAUDE.md conventions: strict mode, no `any`, no non-null
+       assertions on external data. These settings are what make the Zod
+       boundary meaningful — without noUncheckedIndexedAccess and
+       exactOptionalPropertyTypes, parsed data can still lie about its shape. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "useUnknownInCatchVariables": true,
+
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["apps/**/*.ts", "services/**/*.ts", "scripts/**/*.ts", "*.config.ts"],
+  "exclude": ["node_modules", "**/dist", "**/build"]
+}

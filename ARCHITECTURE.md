@@ -16,7 +16,7 @@ Anything not verified is marked as such.
 | App | React Native + TypeScript strict, Expo with dev client | — | Native modules required for passkeys, so Expo Go is not viable |
 | Chain | `viem` | 2.55.16 | Standard, typed, Zod-friendly |
 | ERC-4337 | `permissionless` | 0.3.7 | Do not hand-roll UserOperation construction |
-| Modules | `@rhinestone/module-sdk` | 0.4.0 | Audited module registry; ships every module we need |
+| Modules | `@rhinestone/module-sdk` | 0.4.0 ⚠️ **deprecated** | Ships every module we need, but upstream says switch to `@rhinestone/sdk` — see §11 |
 | Account | Safe + Safe7579 adapter | via `toSafeSmartAccount` | See §2 |
 | Passkeys | `react-native-passkey` | 3.6.1 | Actively maintained; iOS 15+/Android API 28+ |
 | Recovery (Ph2) | `@zk-email/email-recovery` | 1.1.0 | Ackee-audited, live on Base |
@@ -109,6 +109,12 @@ Two ways to get this catastrophically wrong:
 then treat the precompile as present. Cache the result per chain ID. Gas
 estimation must use the correct constant, since 3450 and 6900 are both real
 and a strategy chosen for the wrong one under-quotes the fee.
+
+**Confirmed on Base Sepolia (2026-08-15, block 45,509,248).** The probe returns
+an affirmative `0x…01` and classifies as `precompile`, so Base Sepolia carries
+the precompile at `0x100`. Together with the `@ethereumjs/evm` suite — which
+demonstrates the absent case, the invalid-signature case, and the exact 6900 gas
+charge — both sides of the detection rule are now evidenced rather than argued.
 
 **Client-side interaction.** `@rhinestone/module-sdk`'s
 `WebauthnValidatorSignature` type carries a `usePrecompiled?: boolean` flag, so
@@ -225,6 +231,46 @@ proxy entirely offline. That property is what makes Invariant 2 and Invariant 7
 true rather than aspirational, and it should be an explicit test — "works with
 proxy unreachable" — not an assumption.
 
+**Implemented** in `services/proxy/`. Three properties are enforced in code and
+tested rather than documented and hoped for:
+
+- **Method allowlist, not denylist.** The proxy forwards the chain reads and
+  ERC-4337 methods the wallet needs, and nothing else, so a compromised client
+  cannot use our keys as an open RPC endpoint. Signing methods are refused
+  without contacting an upstream — upstream would reject them anyway, but
+  forwarding them would make the proxy *look* like a signing service, and the
+  shape of an interface teaches people what it is for (Invariant 2).
+- **No upstream error text reaches a client.** Provider keys live in URLs,
+  upstream errors quote the request URL, and the error path is the least
+  exercised in testing — so relaying an upstream failure verbatim is the easiest
+  way to hand a client the key the proxy exists to hide. Clients get a generic
+  failure; operators read their own logs. Tested by feeding the handler an
+  exception containing a live-looking key and asserting it cannot be found
+  anywhere in the response.
+- **Statelessness is tested, not asserted.** No health cache and no circuit
+  breaker, so a failing upstream is not remembered between requests and one
+  request's outcome never depends on another's.
+
+The HTTP binding adds the checks about requests that never reach the handler:
+POST-only on one path, no CORS headers (this endpoint serves our app, not a
+browser origin, and emitting them would let a hostile page spend our API
+quota), and a body cap enforced *during* streaming rather than after buffering —
+a limit applied once the memory is already committed is not a limit.
+X-Forwarded-For is deliberately ignored when identifying a caller, since it is
+client-controlled and honouring it would let an attacker mint a fresh identity
+per request. These are tested against a real bound socket, because streaming
+caps and destroyed sockets do not exist in a mocked request object.
+
+Rate limiting is the one place the proxy remembers anything, and
+`rateLimit.ts` states that tension rather than hiding it: keyed on a transport
+identifier only and never on an account, in memory only, expiring with the
+window, and bounded — an unbounded map keyed by an attacker-controlled value is
+itself a denial-of-service vector. The bound brings an accepted weakness, which
+is documented and pinned by a test rather than left to be discovered.
+
+Still to build before the proxy is deployable: TLS termination and deployment
+config, and certificate pinning at the app end.
+
 Certificate-pin RPC and bundler connections. Treat every response as untrusted
 and parse it with Zod before use, including responses from our own proxy.
 
@@ -262,10 +308,13 @@ reviewable in isolation.
 
 Recorded rather than guessed.
 
-1. **Are the Rhinestone module addresses identical across Base Sepolia and Base
-   mainnet?** The SDK exports single constants, which implies deterministic
-   deployment, but this must be verified on-chain in Phase 1 Task 3 before any
-   address is hardcoded.
+1. ~~**Are the Rhinestone module addresses deployed?**~~ **ANSWERED
+   2026-08-15**, verified against Base Sepolia at block 45,509,248 by
+   `pnpm verify:onchain`. All eight carry code: WebAuthn validator (4,739b),
+   SmartSessions (23,608b), value-limit (2,511b), time-frame (1,911b), sudo
+   (920b), universal email recovery (22,094b), registry (18,522b), multi-factor
+   validator (5,436b). Base *mainnet* parity is still unverified and out of
+   scope until after audit (decision 4).
 2. **Does `react-native-passkey@3.6.1` work under Expo dev client on both
    platforms without patching?** Assume nothing; Phase 1 Task 2 is a spike.
 3. **Real gas cost of a Safe7579 deployment + first UserOp on Base.** Needed to
@@ -285,3 +334,50 @@ EIP-7702 activation (Phase 5), additional chains (Phase 5), ERC-20 paymaster
 token selection (needs the Base decision to be final), and the on-device proving
 question (Phase 2, pending benchmark). None of these should be designed for
 speculatively now.
+
+
+---
+
+## 11. Open decision: the module SDK is deprecated
+
+Found while verifying module deployments on 2026-08-15. `pnpm add
+@rhinestone/module-sdk` reports:
+
+> This SDK is no longer supported. Please switch to '@rhinestone/sdk' to
+> continue getting updates.
+
+`0.4.0` is the final release. This document recommended it without checking
+deprecation status, which was an oversight worth correcting explicitly rather
+than quietly swapping.
+
+**What is and is not at risk.** The module *addresses* are immutable on-chain
+and now independently verified, so nothing about the deployed security
+properties changes. What we lose is maintenance of the client library that
+supplies those constants and encodes init data — a smaller surface than it
+sounds, but not nothing, since a stale encoder against an upgraded module is a
+silent failure.
+
+**The successor is not a like-for-like swap.** `@rhinestone/sdk@2.2.2`
+describes itself as a "vertically integrated smart wallet and crosschain
+liquidity platform" with an intent engine, an orchestrator, a relayer market,
+and gas sponsorship. It covers what we need — `./actions/passkeys`,
+`./signing/passkeys`, `./smart-sessions`, `./actions/recovery`,
+`./actions/mfa` — but `apiKey` appears throughout its `transactions/intents`
+subsystem.
+
+That matters for Invariant 7. A hosted orchestrator in the transaction path
+would be exactly the proprietary channel the invariant forbids. It appears
+avoidable — the intent engine looks separable from the module and passkey
+paths — but "appears avoidable" is not a basis for putting it in a wallet's
+trust path without a deliberate decision.
+
+**Options, for the human to choose:**
+
+| | Approach | Cost |
+|---|---|---|
+| A | Stay on `0.4.0` | No updates ever. Acceptable mainly because we depend on it for constants and ABI encoding, both verifiable on-chain — which `verify:onchain` now does |
+| B | Migrate to `@rhinestone/sdk@2.2.2` | Maintained, but a far larger surface, and needs a careful audit that no orchestrator or API-key path can reach a transaction |
+| C | Vendor the constants | Record the eight verified addresses in our own chain config with the verification evidence, and encode init data with viem directly. Maximum independence, and `verify:onchain` already proves the addresses. Cost: we own the encoding, and must track upstream module upgrades ourselves |
+
+Not decided. Phase 1 can proceed on `0.4.0` either way, because the addresses
+are verified and the encoding is exercised by tests.

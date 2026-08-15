@@ -32,11 +32,21 @@ disagree, this repo is correct and the disagreement is recorded under
 
 ## Current status
 
-**Phase 0 — design documents, awaiting approval. No application code exists yet.**
+**Phase 1 — in progress.** Design docs approved 2026-08-14.
 
-Nothing has been built. `CLAUDE.md`, `ARCHITECTURE.md`, and `PHASES.md` are the
-entire deliverable so far. Phase 1 does not begin until the human approves these
-three files.
+Done: Task 1 (scaffolding), Task 3 (chain config and P-256 detection, verified
+against both a real EVM and live Base Sepolia), Task 11 (security self-review,
+written up in `SECURITY-REVIEW.md`), the pure `core/` logic behind Tasks 7, 8 and
+9, and the stateless proxy from `ARCHITECTURE.md` §7.
+
+Open: Task 2 (passkey spike), 4 (account construction), 5 (wallet creation),
+6 (balance view), 7 (UI), 10 (E2E), 12 (gate). All of these need real devices and
+an iOS/Android toolchain, neither of which exists in the development container.
+
+321 tests, nothing skipped. `pnpm typecheck` and `pnpm lint` clean.
+
+**Phase 1 is not complete and must not be described as such** — see
+[Known gaps](#known-gaps) for the Invariant 3 caveat in particular.
 
 ---
 
@@ -234,19 +244,62 @@ it, and exactly which factors are required and why (Invariant 8).
 
 ## Commands
 
-**None of these exist yet.** They land with Phase 1 Task 1 (repo scaffolding) and
-this section gets updated to match reality at that point. Listed here so the
-shape is agreed in advance.
+These exist and pass:
 
 ```
-pnpm install            # install workspace dependencies
-pnpm typecheck          # tsc --noEmit, strict, must be clean
-pnpm lint               # eslint, must be clean
-pnpm test               # vitest unit tests
-pnpm ios / pnpm android # Expo dev client
-forge test              # contract tests, from packages/contracts
-forge test --match-test invariant   # invariant suite
+pnpm install     # install workspace dependencies
+pnpm typecheck   # tsc --noEmit, strict, must be clean
+pnpm lint        # eslint incl. core/-purity rule, must be clean
+pnpm test        # vitest unit tests
 ```
+
+Not yet scaffolded, because this environment cannot build or run them (see
+[Environment limits](#environment-limits)):
+
+```
+pnpm ios / pnpm android          # Expo dev client — needs macOS/Xcode, Android SDK
+forge test                       # contracts — Foundry not installable here
+forge test --match-test invariant
+```
+
+**Toolchain note.** TypeScript is pinned to 6.0.3 rather than the current 7.0.2
+because `typescript-eslint@8.67.0` declares `typescript >=4.8.4 <6.1.0`. Type-aware
+linting is load-bearing here — it is what enforces `no-floating-promises` and the
+`core/` purity rule — so it wins over the newer compiler. Revisit when
+typescript-eslint supports TS 7.
+
+---
+
+## Environment limits
+
+The container this project has been developed in so far is Linux with Node and
+pnpm only. The following are **not** available, which caps how much of Phase 1
+can be completed or verified here:
+
+| Blocked | Consequence |
+|---|---|
+| No macOS/Xcode, no Android SDK, no devices or emulators | Cannot build, run, or E2E-test the app. Phase 1 Tasks 2, 5, 6, 7 (UI), 10 (E2E), 12 cannot be completed |
+| ~~Egress policy blocks RPC endpoints~~ | **Resolved 2026-08-15.** Base Sepolia is reachable; `pnpm verify:onchain` confirms the precompile and all module deployments |
+| GitHub release assets are scoped to session-attached repos | `foundryup` still fails. This is the GitHub proxy, not the network allowlist, so allowlisting does not fix it. No `forge`/`anvil` yet |
+
+`registry.npmjs.org` **is** reachable, which matters more than it sounds.
+
+**Node's built-in fetch ignores `HTTPS_PROXY`.** viem uses it, so any script
+hitting a live RPC must run with `NODE_USE_ENV_PROXY=1` — without it you get a
+403 that looks like a policy denial but is not one.
+
+**A real EVM is available here** via `@ethereumjs/evm`, installed from npm. It
+supports both the `Prague` and `Osaka` hardforks, so the EIP-7951 precompile at
+`0x100` can be exercised present *and* absent. `p256.evm.test.ts` uses this to
+demonstrate — rather than assert — that a CALL to an empty `0x100` succeeds
+with empty returndata and zero gas, and that the precompile charges exactly
+6900 gas. That closes the most important open question in Task 3 without a live
+chain.
+
+What a real EVM does **not** substitute for: deployed contract addresses, real
+bundler and paymaster behaviour, mainnet-fork state, and Solidity-level tests
+(which need Foundry). Do not mark those done on the strength of unit tests
+against mocks.
 
 ---
 
